@@ -366,3 +366,39 @@ def cerca_ingrediente(query: str):
     
     return {"query": query, "risultati": len(results), "ingredienti": results[:20]}
 
+
+
+# --- PDF Allergeni Generator ---
+from fastapi.responses import Response
+from pdf_allergeni import genera_pdf_allergeni
+
+@app.post("/v1/allergeni/pdf")
+async def genera_pdf(request: dict):
+    """Genera un PDF stampabile con la tabella allergeni del menu.
+    
+    Body JSON:
+    {
+        "ristorante": "Trattoria da Mario",
+        "piatti": [
+            {"nome": "Carbonara", "ingredienti": ["spaghetti", "uova", "guanciale", "pecorino"], "categoria": "Primi"},
+            {"nome": "Tiramisù", "ingredienti": ["savoiardi", "mascarpone", "uova", "cacao"], "categoria": "Dolci"}
+        ]
+    }
+    """
+    nome = request.get("ristorante", "Ristorante")
+    piatti = request.get("piatti", [])
+    
+    if not piatti:
+        raise HTTPException(status_code=400, detail="Fornire lista 'piatti'")
+    
+    if len(piatti) > 100:
+        raise HTTPException(status_code=400, detail="Massimo 100 piatti per PDF")
+    
+    pdf_bytes = genera_pdf_allergeni(nome, piatti)
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=tabella-allergeni-{nome.replace(' ', '-').lower()}.pdf"}
+    )
+
