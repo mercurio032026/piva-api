@@ -299,3 +299,70 @@ def is_today_holiday(anno: int):
     match = [h for h in holidays if h["data"] == today]
     return {"data": today, "festivo": len(match) > 0, "festivita": match[0] if match else None}
 
+
+
+# --- Allergeni API ---
+from allergeni import ALLERGENI_EU, INGREDIENTI_DB, find_allergeni
+
+@app.get("/v1/allergeni")
+def lista_allergeni():
+    """Restituisce la lista completa dei 14 allergeni EU obbligatori."""
+    return {"totale": 14, "allergeni": list(ALLERGENI_EU.values()), "normativa": "Regolamento UE 1169/2011"}
+
+@app.get("/v1/allergeni/ingrediente/{ingrediente}")
+def allergeni_ingrediente(ingrediente: str):
+    """Cerca gli allergeni per un singolo ingrediente."""
+    result = find_allergeni([ingrediente])
+    return result
+
+@app.post("/v1/allergeni/piatto")
+async def allergeni_piatto(request: dict):
+    """Analizza un piatto completo. Body JSON: {"nome": "Carbonara", "ingredienti": ["spaghetti", "uova", "guanciale", "pecorino", "pepe"]}"""
+    nome = request.get("nome", "")
+    ingredienti = request.get("ingredienti", [])
+    if not ingredienti:
+        raise HTTPException(status_code=400, detail="Fornire lista 'ingredienti'")
+    
+    result = find_allergeni(ingredienti)
+    result["piatto"] = nome
+    return result
+
+@app.post("/v1/allergeni/menu")
+async def allergeni_menu(request: dict):
+    """Analizza un menu intero. Body JSON: {"piatti": [{"nome": "...", "ingredienti": [...]}, ...]}"""
+    piatti = request.get("piatti", [])
+    if not piatti:
+        raise HTTPException(status_code=400, detail="Fornire lista 'piatti'")
+    
+    menu_result = []
+    for piatto in piatti:
+        nome = piatto.get("nome", "")
+        ingredienti = piatto.get("ingredienti", [])
+        result = find_allergeni(ingredienti)
+        result["piatto"] = nome
+        menu_result.append(result)
+    
+    # Summary: all unique allergens across entire menu
+    all_allergen_ids = set()
+    for r in menu_result:
+        for a in r["allergeni"]:
+            all_allergen_ids.add(a["id"])
+    
+    return {
+        "piatti_analizzati": len(menu_result),
+        "allergeni_totali_menu": len(all_allergen_ids),
+        "dettaglio": menu_result
+    }
+
+@app.get("/v1/allergeni/cerca/{query}")
+def cerca_ingrediente(query: str):
+    """Cerca ingredienti nel database per nome (parziale)."""
+    query_lower = query.lower().strip()
+    results = []
+    for ing, aids in INGREDIENTI_DB.items():
+        if query_lower in ing:
+            allergeni_nomi = [ALLERGENI_EU[a]["nome"] for a in aids] if aids else ["Nessun allergene"]
+            results.append({"ingrediente": ing, "allergeni": allergeni_nomi})
+    
+    return {"query": query, "risultati": len(results), "ingredienti": results[:20]}
+
