@@ -107,3 +107,195 @@ def validate_both(piva: Optional[str] = None, cf: Optional[str] = None):
         response["codice_fiscale"] = validate_cf(cf)
     return response
 
+
+
+# --- IBAN Validator (Italian) ---
+
+def validate_iban_it(iban: str) -> dict:
+    iban = iban.upper().replace(" ", "").replace("-", "")
+    
+    if not iban.startswith("IT"):
+        return {"valid": False, "error": "Solo IBAN italiani (IT) supportati"}
+    
+    if len(iban) != 27:
+        return {"valid": False, "error": f"Lunghezza errata: {len(iban)} invece di 27"}
+    
+    # Move first 4 chars to end, convert letters to numbers
+    rearranged = iban[4:] + iban[:4]
+    numeric = ""
+    for c in rearranged:
+        if c.isdigit():
+            numeric += c
+        elif c.isalpha():
+            numeric += str(ord(c) - ord('A') + 10)
+        else:
+            return {"valid": False, "error": "Carattere non valido"}
+    
+    if int(numeric) % 97 != 1:
+        return {"valid": False, "error": "Checksum IBAN non valido"}
+    
+    return {
+        "valid": True,
+        "iban": iban,
+        "country": "IT",
+        "check_digits": iban[2:4],
+        "cin": iban[4],
+        "abi": iban[5:10],
+        "cab": iban[10:15],
+        "conto": iban[15:27]
+    }
+
+
+@app.get("/v1/iban/{iban}")
+def check_iban(iban: str):
+    result = validate_iban_it(iban)
+    if not result["valid"]:
+        raise HTTPException(status_code=422, detail=result["error"])
+    return result
+
+
+# --- Codice Fiscale Generator ---
+
+MONTH_CODES = {'01':'A','02':'B','03':'C','04':'D','05':'E','06':'H',
+               '07':'L','08':'M','09':'P','10':'R','11':'S','12':'T'}
+
+OMOCODIA_CHARS = "LMNPQRSTUV"
+
+def generate_cf(cognome: str, nome: str, data_nascita: str, sesso: str, codice_comune: str) -> dict:
+    """Genera CF da dati anagrafici. data_nascita: YYYY-MM-DD, sesso: M/F"""
+    
+    def extract_consonants(s):
+        return [c for c in s.upper() if c.isalpha() and c not in 'AEIOU']
+    
+    def extract_vowels(s):
+        return [c for c in s.upper() if c.isalpha() and c in 'AEIOU']
+    
+    # Cognome: 3 consonanti, poi vocali, poi X
+    cons = extract_consonants(cognome)
+    vow = extract_vowels(cognome)
+    pool = cons + vow + ['X', 'X', 'X']
+    cf_cognome = ''.join(pool[:3])
+    
+    # Nome: se >= 4 consonanti, prendi 1a, 3a, 4a; altrimenti come cognome
+    cons = extract_consonants(nome)
+    vow = extract_vowels(nome)
+    if len(cons) >= 4:
+        cf_nome = cons[0] + cons[2] + cons[3]
+    else:
+        pool = cons + vow + ['X', 'X', 'X']
+        cf_nome = ''.join(pool[:3])
+    
+    # Data
+    year = data_nascita[:4]
+    month = data_nascita[5:7]
+    day = int(data_nascita[8:10])
+    
+    cf_anno = year[2:4]
+    cf_mese = MONTH_CODES.get(month, '?')
+    cf_giorno = str(day if sesso.upper() == 'M' else day + 40).zfill(2)
+    
+    # Comune
+    cf_comune = codice_comune.upper()
+    
+    # Assemble first 15 chars
+    partial = cf_cognome + cf_nome + cf_anno + cf_mese + cf_giorno + cf_comune
+    
+    # Checksum
+    total = sum(
+        ODD_MAP.get(c, 0) if i % 2 == 0 else EVEN_MAP.get(c, 0) 
+        for i, c in enumerate(partial)
+    )
+    check = chr(65 + (total % 26))
+    
+    cf = partial + check
+    
+    return {
+        "codice_fiscale": cf,
+        "componenti": {
+            "cognome": cf_cognome,
+            "nome": cf_nome,
+            "anno": cf_anno,
+            "mese": cf_mese,
+            "giorno": cf_giorno,
+            "comune": cf_comune,
+            "controllo": check
+        }
+    }
+
+
+@app.get("/v1/cf/genera")
+def genera_cf(cognome: str, nome: str, data_nascita: str, sesso: str, codice_comune: str):
+    """Genera un Codice Fiscale dai dati anagrafici.
+    
+    - cognome: cognome della persona
+    - nome: nome della persona  
+    - data_nascita: data di nascita (YYYY-MM-DD)
+    - sesso: M o F
+    - codice_comune: codice catastale del comune (es. H501 per Roma)
+    """
+    try:
+        result = generate_cf(cognome, nome, data_nascita, sesso, codice_comune)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# --- Italian Holidays API ---
+
+def get_italian_holidays(year: int) -> list:
+    """Restituisce le festività italiane per un dato anno."""
+    import datetime
+    
+    # Easter calculation (Anonymous Gregorian algorithm)
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    easter = datetime.date(year, month, day)
+    pasquetta = easter + datetime.timedelta(days=1)
+    
+    holidays = [
+        {"data": f"{year}-01-01", "nome": "Capodanno", "tipo": "fisso"},
+        {"data": f"{year}-01-06", "nome": "Epifania", "tipo": "fisso"},
+        {"data": easter.isoformat(), "nome": "Pasqua", "tipo": "mobile"},
+        {"data": pasquetta.isoformat(), "nome": "Lunedì dell'Angelo", "tipo": "mobile"},
+        {"data": f"{year}-04-25", "nome": "Festa della Liberazione", "tipo": "fisso"},
+        {"data": f"{year}-05-01", "nome": "Festa dei Lavoratori", "tipo": "fisso"},
+        {"data": f"{year}-06-02", "nome": "Festa della Repubblica", "tipo": "fisso"},
+        {"data": f"{year}-08-15", "nome": "Ferragosto", "tipo": "fisso"},
+        {"data": f"{year}-11-01", "nome": "Ognissanti", "tipo": "fisso"},
+        {"data": f"{year}-12-08", "nome": "Immacolata Concezione", "tipo": "fisso"},
+        {"data": f"{year}-12-25", "nome": "Natale", "tipo": "fisso"},
+        {"data": f"{year}-12-26", "nome": "Santo Stefano", "tipo": "fisso"},
+    ]
+    
+    return holidays
+
+
+@app.get("/v1/festivita/{anno}")
+def festivita(anno: int):
+    """Restituisce tutte le festività italiane per l'anno specificato."""
+    if anno < 1946 or anno > 2100:
+        raise HTTPException(status_code=400, detail="Anno deve essere tra 1946 e 2100")
+    return {"anno": anno, "festivita": get_italian_holidays(anno)}
+
+
+@app.get("/v1/festivita/{anno}/oggi")
+def is_today_holiday(anno: int):
+    """Controlla se oggi è una festività italiana."""
+    import datetime
+    today = datetime.date.today().isoformat()
+    holidays = get_italian_holidays(anno)
+    match = [h for h in holidays if h["data"] == today]
+    return {"data": today, "festivo": len(match) > 0, "festivita": match[0] if match else None}
+
