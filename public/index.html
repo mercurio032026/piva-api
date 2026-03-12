@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P.IVA API — Validazione Partita IVA e Codice Fiscale</title>
+<meta name="description" content="API REST gratuita per validare Partite IVA e Codici Fiscali italiani. Nessuna registrazione. Risposta in millisecondi.">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; line-height: 1.6; }
+  .hero { max-width: 800px; margin: 0 auto; padding: 80px 24px 40px; text-align: center; }
+  h1 { font-size: 2.5rem; font-weight: 700; color: #fff; margin-bottom: 16px; }
+  .subtitle { font-size: 1.1rem; color: #888; margin-bottom: 48px; }
+  .badge { display: inline-block; background: #1a1a2e; border: 1px solid #333; border-radius: 20px; padding: 4px 14px; font-size: 0.8rem; color: #4fc3f7; margin-bottom: 24px; }
+  .demo { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 32px; margin: 40px auto; max-width: 700px; text-align: left; }
+  .demo h2 { color: #fff; margin-bottom: 20px; font-size: 1.1rem; }
+  .code { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; font-family: 'Monaco', monospace; font-size: 0.85rem; overflow-x: auto; color: #c9d1d9; margin-bottom: 16px; }
+  .green { color: #56d364; }
+  .blue { color: #79c0ff; }
+  .yellow { color: #e3b341; }
+  .pricing { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 700px; margin: 40px auto; }
+  .plan { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 24px; }
+  .plan.featured { border-color: #4fc3f7; }
+  .plan-name { font-weight: 700; font-size: 1rem; color: #fff; }
+  .plan-price { font-size: 2rem; font-weight: 700; color: #4fc3f7; margin: 8px 0; }
+  .plan-price span { font-size: 0.9rem; color: #666; font-weight: 400; }
+  .plan ul { list-style: none; margin-top: 16px; }
+  .plan ul li::before { content: "✓ "; color: #56d364; }
+  .plan ul li { margin-bottom: 8px; color: #aaa; font-size: 0.9rem; }
+  footer { text-align: center; color: #444; padding: 40px; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="badge">🇮🇹 Made in Italy • Server EU</div>
+  <h1>P.IVA API</h1>
+  <p class="subtitle">Valida Partite IVA e Codici Fiscali italiani in millisecondi.<br>REST API semplice, documentata, sempre disponibile.</p>
+</div>
+
+<div class="demo">
+  <h2>📡 Esempi rapidi</h2>
+  <div class="code">
+<span class="blue">GET</span> /v1/piva/<span class="yellow">12345670017</span>
+
+<span class="green">{
+  "valid": true,
+  "partita_iva": "12345670017",
+  "formatted": "IT12345670017"
+}</span>
+  </div>
+  <div class="code">
+<span class="blue">GET</span> /v1/cf/<span class="yellow">RSSMRA85M01H501Z</span>
+
+<span class="green">{
+  "valid": true,
+  "codice_fiscale": "RSSMRA85M01H501Z"
+}</span>
+  </div>
+  <p style="color:#666; font-size:0.85rem; margin-top:12px;">Documentazione completa disponibile su <a href="/docs" style="color:#4fc3f7;">/docs</a></p>
+</div>
+
+<div class="pricing">
+  <div class="plan">
+    <div class="plan-name">Free</div>
+    <div class="plan-price">€0 <span>/mese</span></div>
+    <ul>
+      <li>1.000 richieste/mese</li>
+      <li>P.IVA + Codice Fiscale</li>
+      <li>Nessuna carta richiesta</li>
+      <li>Rate limit: 10 req/sec</li>
+    </ul>
+  </div>
+  <div class="plan featured">
+    <div class="plan-name">Pro</div>
+    <div class="plan-price">€9 <span>/mese</span></div>
+    <ul>
+      <li>50.000 richieste/mese</li>
+      <li>P.IVA + Codice Fiscale</li>
+      <li>Rate limit: 100 req/sec</li>
+      <li>Supporto prioritario</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  P.IVA API — Dati elaborati localmente, nessun log, nessun tracking. Server EU 🇪🇺
+</footer>
+</body>
+</html>
